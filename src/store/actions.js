@@ -1,45 +1,73 @@
-import {getStore, setStore,removeStore} from '@/assets/js/storage'
+import {setStore, removeStore} from '@/assets/js/storage'
+import {_checkLogin, _currentMember} from "../api/user";
 
 export default {
-    SET_LOGGED({commit, state}, data) {
-        setStore('token', data.token, true, data.duration);
-        setStore('user_info', data.user_info);
+    SET_LOGGED({commit}, data) {
+        setStore('tokenList', data.tokenList);
+        setStore('userInfo', data.userInfo);
         commit('SET_LOGGED', data);
     },
+    SET_USER({commit}, data) {
+        setStore('userInfo', data);
+        commit('SET_USER', data);
+    },
     SET_LOGOUT({commit}) {
-        removeStore('token');
-        removeStore('token');
-        removeStore('menu_list');
-        removeStore('menu_model_list');
-        removeStore('menu_model');
-        removeStore('user_info');
-        removeStore('user_name');
+        removeStore('tokenList');
+        removeStore('userInfo');
         commit('SET_LOGOUT');
     },
-    SET_PAGE_LOADING({commit}, status) {
-        commit('SET_PAGE_LOADING', status);
+    getUser({commit}) {
+        _currentMember().then(res => {
+            if (!res.data) {
+                removeStore('tokenList');
+                removeStore('userInfo');
+                commit('SET_LOGOUT');
+            }else{
+                setStore('userInfo', res.data);
+                commit('SET_USER', res.data);
+            }
+        });
     },
-    SET_LIST_RELOAD({commit}, status) {
-        commit('SET_LIST_RELOAD', status);
+    checkLogin({commit}) {
+        _checkLogin().then(res => {
+            if (res.data) {
+                const obj = {
+                    userInfo: res.data.member,
+                    tokenList: res.data.tokenList
+                };
+                setStore('tokenList', obj.tokenList);
+                setStore('userInfo', obj.userInfo);
+                commit('SET_LOGGED', obj);
+            } else {
+                removeStore('tokenList');
+                removeStore('userInfo');
+                commit('SET_LOGOUT');
+            }
+        });
     },
-    SET_MENU_SLIDE({commit}, status) {
-        commit('SET_MENU_SLIDE', status);
+    setTheme({commit}, theme) {
+        setStore('theme', theme);
+        commit('setTheme', theme);
     },
-    UPDATE_ONLINE_USER({commit}, data) {
-        commit('UPDATE_ONLINE_USER', data);
+    pageLoading({commit}, status) {
+        commit('pageLoading', status);
     },
-    UPDATE_NOTIFY_NO_READ_LIST({commit}, data) {
-        commit('UPDATE_NOTIFY_NO_READ_LIST', data);
+    windowLoading({commit}, status) {
+        commit('windowLoading', status);
     },
-    UPDATE_NOTIFY_NO_READ_COUNT({commit}, num) {
-        commit('UPDATE_NOTIFY_NO_READ_COUNT', num);
+    setOrganizationList({commit}, data) {
+        setStore('organizationList', data);
+        commit('setOrganizationList', data);
     },
-    SET_SYSTEM_INFO({commit}, data) {
-        setStore('system_info', data);
-        commit('SET_SYSTEM_INFO', data);
+    setCurrentOrganization({commit}, data) {
+        setStore('currentOrganization', data);
+        commit('setCurrentOrganization', data);
     },
-    SET_LAST_PATH({commit}, path) {
-        setStore('last_path', path);
-        commit('SET_LAST_PATH', path);
+    setSystem({commit}, data) {
+        setStore('system', data);
+        commit('setSystem', data);
+    },
+    setBoundClient({commit}, data) {
+        commit('setBoundClient', data);
     },
 }
