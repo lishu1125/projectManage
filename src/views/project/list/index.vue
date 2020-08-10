@@ -28,9 +28,16 @@
                       </a-form-item>
                   </a-form>
               </div>-->
-            <div class="action">
+          <!--  <div class="action">
                 <a-button type="primary" icon="plus" @click="doAction(null,'new')">创建新项目</a-button>
-            </div>
+            </div>-->
+            <a-tabs v-model="selectBy" @change="selectChange" :animated="false">
+                <a-tab-pane key="my" tab="全部项目"></a-tab-pane>
+                <a-tab-pane key="collect" tab="我的收藏"></a-tab-pane>
+                <a-tab-pane key="archive" tab="已归档"></a-tab-pane>
+                <a-tab-pane key="deleted" tab="回收站"></a-tab-pane>
+                <a-button slot="tabBarExtraContent" type="primary" icon="plus" @click="doAction(null,'new')">创建新项目</a-button>
+            </a-tabs>
             <a-list
                     class="project-list"
                     :loading="loading"
@@ -43,27 +50,6 @@
                     <a-button v-else @click="onLoadMore">查看更多项目</a-button>
                 </div>
                 <a-list-item slot="renderItem" slot-scope="item,index">
-                    <span slot="actions" @click="inviteProjectMember(item)">
-                         <a-tooltip title="添加成员">
-                             <a-icon type="user-add"/>
-                         </a-tooltip>
-                    </span>
-                    <span slot="actions" @click="doAction(item,'del',index)">
-                         <a-tooltip title="移至回收站">
-                              <a-icon type="delete"/>
-                         </a-tooltip>
-                    </span>
-                    <span slot="actions" @click="doAction(item,'edit',index)">
-                         <a-tooltip title="项目设置">
-                              <a-icon type="setting"/>
-                         </a-tooltip>
-                    </span>
-                    <span slot="actions">
-                         <a-tooltip :title="item.collected ? '取消收藏' : '加入收藏'" @click="doAction(item,'collect',index)">
-                             <a-icon type="star" v-show="!item.collected"/>
-                             <a-icon type="star" theme="filled" style="color: #ffaf38;" v-show="item.collected"/>
-                         </a-tooltip>
-                    </span>
                     <a-list-item-meta
                             :description="item.description"
                     >
@@ -73,20 +59,62 @@
                         </div>
                         <a-avatar slot="avatar" icon="user" :src="item.cover"/>
                     </a-list-item-meta>
-                    <div class="other-info muted">
-                        <div class="info-item">
-                            <span>创建日期</span>
-                            <span>{{moment(item.create_time).format('YYYY-MM-DD')}}</span>
-                        </div>
-                        <div class="info-item">
-                            <span>创建人</span>
-                            <span>{{item.owner_name}}</span>
-                        </div>
-                        <div class="info-item schedule">
-                            <span>进度</span>
-                            <a-progress :strokeWidth="5" :percent="item.schedule"/>
+                    <div class="ant-list-item-content">
+                        <div class="other-info muted">
+                            <div class="info-item">
+                                <span>创建日期</span>
+                                <span>{{moment(item.create_time).format('YYYY-MM-DD')}}</span>
+                            </div>
+                            <div class="info-item">
+                                <span>创建人</span>
+                                <span>{{item.owner_name}}</span>
+                            </div>
+                            <div class="info-item schedule">
+                                <span>进度</span>
+                                <a-progress :strokeWidth="5" :percent="item.schedule"/>
+                            </div>
                         </div>
                     </div>
+                    <template v-if="selectBy === 'my' || selectBy === 'collect'">
+                        <span slot="actions" @click="inviteProjectMember(item)">
+                             <a-tooltip title="添加成员">
+                                 <a-icon type="user-add"/>
+                             </a-tooltip>
+                        </span>
+                        <span slot="actions" @click="doAction(item,'edit',index)">
+                             <a-tooltip title="项目设置">
+                                  <a-icon type="setting"/>
+                             </a-tooltip>
+                        </span>
+                        <span slot="actions">
+                             <a-tooltip :title="item.collected ? '取消收藏' : '加入收藏'"
+                                        @click="doAction(item,'collect',index)">
+                                 <a-icon type="star" v-show="!item.collected"/>
+                                 <a-icon type="star" theme="filled" style="color: #ffaf38;" v-show="item.collected"/>
+                             </a-tooltip>
+                        </span>
+                    </template>
+                    <template v-if="selectBy === 'archive'">
+                         <span slot="actions">
+                         <a-tooltip title="恢复项目" @click="doAction(item,'recoveryArchive',index)">
+                             <a-icon type="undo"/>
+                         </a-tooltip>
+                    </span>
+                    </template>
+                    <template v-if="selectBy === 'archive' || selectBy === 'my' || selectBy === 'collect'">
+                             <span slot="actions" @click="doAction(item,'del',index)">
+                             <a-tooltip title="移至回收站">
+                                  <a-icon type="delete"/>
+                             </a-tooltip>
+                        </span>
+                    </template>
+                    <template v-if="selectBy === 'deleted'">
+                        <span slot="actions">
+                             <a-tooltip title="恢复项目" @click="doAction(item,'recovery',index)">
+                                 <a-icon type="undo"/>
+                             </a-tooltip>
+                        </span>
+                    </template>
                 </a-list-item>
             </a-list>
         </wrapper-content>
@@ -169,6 +197,7 @@
     import moment from 'moment';
     import {collect} from "../../../api/projectCollect";
     import {list as projectTemplates} from "../../../api/projectTemplate";
+    import {recovery, recoveryArchive} from "../../../api/project";
 
     export default {
         components: {
@@ -178,6 +207,7 @@
         mixins: [pagination],
         data() {
             return {
+                selectBy: this.$route.params.type || 'my',
                 dataSource: [],
                 loading: true,
                 showLoadingMore: false,
@@ -206,6 +236,7 @@
         },
         watch: {
             $route: function () {
+                this.selectBy =  this.$route.params.type || 'my'
                 this.init();
             },
         },
@@ -220,10 +251,10 @@
                 if (reset) {
                     this.dataSource = [];
                     this.pagination.page = 1;
-                    this.pagination.pageSize = 1000;
+                    this.pagination.pageSize = 100;
                     this.showLoadingMore = false;
                 }
-                this.requestData.type = this.$route.params.type;
+                this.requestData.selectBy = this.selectBy;
                 app.loading = true;
                 list(app.requestData).then(res => {
                     app.dataSource = app.dataSource.concat(res.data.list);
@@ -285,6 +316,35 @@
                             app.dataSource.splice(index, 1);
                         }
                     });
+                } else if (action == 'recoveryArchive') {
+                    this.$confirm({
+                        title: '取消归档项目？',
+                        content: `取消归档「${this.currentProject.name}」后就可以正常使用了`,
+                        okText: '取消归档',
+                        okType: 'primary',
+                        cancelText: '再想想',
+                        onOk() {
+                            recoveryArchive(record.code).then(()=>{
+                                app.dataSource.splice(index, 1);
+                            });
+                            return Promise.resolve();
+                        }
+                    });
+                } else if (action == 'recovery') {
+                    this.$confirm({
+                        title: '确定恢复项目？',
+                        content: `恢复「${this.currentProject.name}」后就可以正常使用了`,
+                        okText: '恢复项目',
+                        okType: 'primary',
+                        cancelText: '再想想',
+                        onOk() {
+                            recovery(record.code).then(()=>{
+                                app.dataSource.splice(index, 1);
+                                // app.init();
+                            });
+                            return Promise.resolve();
+                        }
+                    });
                 }
             },
             updateProject(data) {
@@ -337,6 +397,9 @@
                 Object.assign(this.requestData, obj);
                 this.init();
             },
+            selectChange() {
+                this.init();
+            }
         }
     }
 </script>
@@ -354,6 +417,16 @@
             }
 
             .ant-list-item-content {
+                display: -webkit-box;
+                display: -ms-flexbox;
+                display: flex;
+                -webkit-box-flex: 1;
+                -ms-flex: 1;
+                flex: 1;
+                -webkit-box-pack: end;
+                -ms-flex-pack: end;
+                justify-content: flex-end;
+
                 .other-info {
                     display: flex;
 
